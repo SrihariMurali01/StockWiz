@@ -1,0 +1,9 @@
+Flask
+requests
+groq
+matplotlib
+pandas
+beautifulsoup4
+lxml
+python-dotenv
+streamlit
