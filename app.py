@@ -7,7 +7,20 @@ if 'history' not in st.session_state:
 if 'chart' not in st.session_state:
     st.session_state['chart'] = None
 
-st.title("Stock Market Chatbot")
+# Title and Subheading
+st.title("StockWiz: Your Market Guru 🤖")
+st.subheader("Cracking the stock market, one chat at a time!")
+
+# Developer Credit
+st.markdown("**Developed by Srihari M | sriharisai6230@gmail.com**")
+
+def reset_chat():
+    st.session_state['history'] = []
+    st.session_state['chart'] = None  # Reset the chart as well
+
+if st.button("Reset Chat"):
+    reset_chat()
+    st.rerun()
 
 # Display chat history and scroll to the bottom
 if st.session_state['history']:
@@ -24,20 +37,20 @@ if st.session_state['history']:
     # Add a script to scroll to the bottom of the chat
     st.markdown("""
         <script>
-        var chatBox = window.parent.document.querySelector('section.main');
+        const chatBox = window.parent.document.querySelector('section.main');
         chatBox.scrollTop = chatBox.scrollHeight;
         </script>
         """, unsafe_allow_html=True)
 
-# Place the text input at the bottom
-user_message = st.text_input("Type your message here:")
-
-if st.button("Send"):
+# Function to send a message and clear the input box
+def send_message():
+    user_message = st.session_state["new_message"]
     if user_message:
         # Send the user message to the Flask backend
         response = requests.post(
             "http://localhost:5000/chat",  # Make sure the Flask app is running on this address
-            json={"message": user_message}
+            json={"message": user_message,
+                  "history": st.session_state['history']}
         )
         
         if response.status_code == 200:
@@ -50,6 +63,10 @@ if st.button("Send"):
             st.session_state['chart'] = chart_path
         else:
             st.session_state['history'].append({"user": user_message, "bot": "Error: Could not retrieve response."})
+        
+        # Clear the input box
+        st.session_state["new_message"] = ""
 
-    # Refresh the page to show the new message at the bottom
-    st.rerun()
+# Input box and send button
+st.text_input("Type your message here:", key="new_message", on_change=send_message)
+

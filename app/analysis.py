@@ -1,25 +1,50 @@
+import json
 import os
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 from groq import Groq
-import re
+
 
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-def analyze_request(user_message):
+def analyze_request(user_message, chat_history):
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    charts = 0
     if "stock" in user_message.lower() or "price" in user_message.lower() or "market" in user_message.lower():
         stock_symbol = extract_stock_symbol_groq(user_message)
-        print(stock_symbol)
         stock_analysis = analyze_stock(stock_symbol)
-        response_text = f"The analysis for {stock_symbol}:\n {stock_analysis}"
+        response_text = f"Analyis:\n{stock_analysis}"
         news_analysis = analyze_news(stock_symbol)
-        response_text += f"\n\n\n\n\n\nNews analysis for {stock_symbol}: {news_analysis}"
+        response_text += f"\n\nNews analysis:\n{news_analysis}"
+        chat_history.append({"role": "assistant", "content": response_text})
+        charts = 1
     else:
-        response_text = "I'm here to help you with stock and news analysis. Please specify what you would like to know."
+        # Append the user's message to the chat history
+        chat_history.append({"role": "user", "content": user_message})
+        if len(chat_history) > 3:
+            chat_history = chat_history[-3:]
+        histories = ""
+        # Generate a generic response using the entire chat history
+        for dicts in chat_history:
+            histories += json.dumps(dicts)
+
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{
+                'role': "user", "content": f"This is is the history: {histories}. The new message: {user_message}. Reply to the new message. Just analyse the history, and normally answer the new message. Do not answer in dictionary format. Just tell the current answer only. Do not tell about the histories. Analysis is only for you to learn, not to showcase in output."
+            }]
+        )
+        
+        # Capture Groq's response and append it to the chat history
+        generic_response = ""
+        generic_response += response.choices[0].message.content or ""
+        
+        chat_history.append({"role": "assistant", "content": generic_response})
+        
+        response_text = generic_response
     
-    return response_text
+    return response_text, chat_history, charts
 
 def extract_stock_symbol_groq(user_message):
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -34,10 +59,6 @@ def extract_stock_symbol_groq(user_message):
     
     symbol = symbol.strip().upper()
     
-    # Fallback with regex if the symbol extracted is empty or seems incorrect
-    if not symbol or not re.match(r'^[A-Z]{1,5}$', symbol):
-        match = re.search(r'\b[A-Z]{1,5}\b', user_message.upper())
-        symbol = match.group(0) if match else None
     
     return symbol
 
@@ -46,7 +67,7 @@ def analyze_stock(stock_symbol):
     response = client.chat.completions.create(
         model="llama3-8b-8192",
         messages=[
-            {"role": "user", "content": f"Analyze the stock performance of {stock_symbol}."}
+            {"role": "user", "content": f"Analyze the stock performance of {stock_symbol}. Limit yourself , and give answers in a limited manner."}
         ]
     )
     analysis_result = ""
@@ -54,15 +75,23 @@ def analyze_stock(stock_symbol):
     return analysis_result
 
 def generate_charts(stock_symbol, time_series="monthly"):
+    # Ensure that Matplotlib doesn't try to use any GUI backend
+    plt.switch_backend('Agg')
+
     # Set the function name based on the time series type
     function_name = "TIME_SERIES_MONTHLY" if time_series == "monthly" else "TIME_SERIES_WEEKLY"
     
+    ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
     url = f"https://www.alphavantage.co/query?function={function_name}&symbol={extract_stock_symbol_groq(stock_symbol)}&apikey={ALPHA_VANTAGE_API_KEY}"
     response = requests.get(url)
     data = response.json()
-
+    
+    if "subscribe" in data:
+        return None
     if "Monthly Time Series" in data:
         time_series_data = data["Monthly Time Series"]
+    elif "Weekly Time Series" in data:
+        time_series_data = data["Weekly Time Series"]
     else:
         return None  # No data available, return None instead of a string
 
@@ -79,7 +108,11 @@ def generate_charts(stock_symbol, time_series="monthly"):
     plt.xlabel("Date")
     plt.ylabel("Closing Price")
     
-    chart_path = f"./static/{stock_symbol}_{time_series}_chart.png"
+    # Ensure the static directory exists
+    if not os.path.exists('static'):
+        os.makedirs('static')
+
+    chart_path = f"static/{stock_symbol}_{time_series}_chart.png"
     plt.savefig(chart_path)
     plt.close()
     
@@ -98,7 +131,6 @@ def analyze_news(company_name):
         'q': company_name,
         'language': 'en',
         'sortBy': 'relevancy',
-        'pageSize': 5,  # Limit to 5 articles for brevity
         'apiKey': api_key
     }
     
@@ -134,7 +166,7 @@ def analyze_stock_effect(news_text, stock_symbol):
     response = client.chat.completions.create(
         model="llama3-8b-8192",
         messages=[
-            {"role": "user", "content": f"Analyze how this news affects the stock value of the stock of {stock_symbol}: {news_text}"}
+            {"role": "user", "content": f"Analyze how this news affects the stock value of the stock of {stock_symbol}: {news_text}. Be very concise."}
         ]
     )
     analysis_result = ""
