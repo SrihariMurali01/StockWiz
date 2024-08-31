@@ -1,6 +1,6 @@
 # StockWiz: Your Market Guru 🤖
 
-![Homepage](static/homepage.png)
+<img src="static/homepage.png" alt="Homepage" width="600" height="400">
 
 ## Overview
 
