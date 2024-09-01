@@ -72,6 +72,43 @@ To set up the project on your local machine, follow these steps:
    streamlit run app.py
    ```
 
+## Docker Setup
+
+If you prefer to run StockWiz using Docker, follow these steps:
+
+### Prerequisites
+
+- Make sure you have Docker installed on your system.
+
+### Pull the Docker Image
+
+To get the latest version of StockWiz as a Docker image, run:
+
+```bash
+docker pull kingpin620/stockwiz:latest
+```
+
+### Running the Docker Container
+
+After pulling the image, start a container with:
+
+```bash
+docker run -p 8501:8501 -p 5000:5000 kingpin620/stockwiz:latest
+```
+
+### Accessing the Application
+
+- **Streamlit Interface**: Open your web browser and navigate to `http://localhost:8501`.
+- **Flask Backend**: The Flask backend will be accessible at `http://localhost:5000`.
+
+### Stopping the Container
+
+To stop the Docker container, press `Ctrl+C` in the terminal where the container is running. Alternatively, use:
+
+```bash
+docker stop <container_id>
+```
+
 ## Usage
 
 Once the project is set up and running:
